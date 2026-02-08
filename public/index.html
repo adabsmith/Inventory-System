@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reflex2k Inventory</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- qrious CDN (for QR Codes) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom spinner for buttons */
+        .btn-spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            width: 1rem;
+            height: 1rem;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast notification transitions */
+        .toast {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast-hidden {
+            opacity: 0;
+            transform: translateX(110%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 text-white min-h-screen p-4 md:p-8">
+
+    <!-- Toast Notifications Area -->
+    <div class="fixed top-4 right-4 z-[100] space-y-3 w-80">
+        <!-- Success Toast -->
+        <div id="success-toast" class="toast toast-hidden bg-green-600 text-white p-4 rounded-lg shadow-lg flex items-center gap-3">
+            <!-- Check Icon -->
+            <svg class="w-6 h-6 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span id="success-message"></span>
+        </div>
+        <!-- Error Toast -->
+        <div id="error-toast" class="toast toast-hidden bg-red-600 text-white p-4 rounded-lg shadow-lg flex items-center gap-3">
+            <!-- Error Icon -->
+            <svg class="w-6 h-6 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span id="error-message"></span>
+        </div>
+    </div>
+
+    <!-- AI Report Modal -->
+    <div id="report-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-80">
+        <div class="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full p-6 relative">
+            <!-- Close Button -->
+            <button onclick="showReportModal(false)" class="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h3 class="text-xl font-semibold mb-4 text-white">✨ AI Inventory Report</h3>
+            <div id="report-modal-content" class="min-h-[150px] text-gray-300">
+                <!-- Spinner -->
+                <div id="report-modal-spinner" class="hidden items-center justify-center h-full">
+                    <div class="btn-spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
+                </div>
+                <!-- Text -->
+                <p id="report-modal-text" class="text-base leading-relaxed"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Scan Modal (for Store Keeper) -->
+    <div id="item-scan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-80">
+        <div class="bg-gray-800 rounded-lg shadow-2xl max-w-lg w-full p-6 relative">
+            <!-- Close Button -->
+            <button onclick="closeItemScanModal()" class="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h3 class="text-xl font-semibold mb-4 text-white">Update Scanned Item</h3>
+            
+            <!-- Modal Content -->
+            <div id="scan-modal-content" class="text-gray-300">
+                <!-- Item Details -->
+                <div class="mb-6 space-y-2">
+                    <p><strong>Style:</strong> <span id="scan-item-style" class="text-cyan-400"></span></p>
+                    <p><strong>Design:</strong> <span id="scan-item-design" class="text-gray-200"></span></p>
+                    <p><strong>Size:</strong> <span id="scan-item-size" class="text-gray-200"></span></p>
+                    <p><strong>Client:</strong> <span id="scan-item-client" class="text-yellow-400"></span></p>
+                </div>
+
+                <!-- Update Quantity Section -->
+                <div id="scan-quantity-section" class="pt-6 border-t border-gray-700">
+                    <h4 class="text-lg font-semibold text-white mb-3">Update Quantity</h4>
+                    <p class="text-gray-300 mb-4">Current Stock: 
+                        <span id="scan-current-stock-display" class="text-2xl font-bold text-cyan-400">0</span>
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="flex-grow">
+                            <label for="scan-quantity-change-input" class="sr-only">Amount to Add/Remove</label>
+                            <input type="number" id="scan-quantity-change-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="Enter amount" min="1">
+                        </div>
+                        <button type="button" id="scan-add-stock-btn" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:opacity-50">
+                            <span class="btn-spinner hidden"></span>
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                            <span>Add Stock</span>
+                        </button>
+                        <button type="button" id="scan-remove-stock-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 disabled:opacity-50">
+                            <span class="btn-spinner hidden"></span>
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
+                            <span>Remove Stock</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Main Application Container -->
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Header -->
+        <header class="text-center mb-10 flex items-center justify-center gap-3">
+            <!-- Simple Logo -->
+            <svg class="w-10 h-10 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+            </svg>
+            <h1 class="text-3xl md:text-4xl font-bold text-white">
+                Reflex2k <span class="text-cyan-400">Inventory</span>
+            </h1>
+        </header>
+
+        <!-- Full-page Loading Spinner (for view changes) -->
+        <div id="loading" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="btn-spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
+        </div>
+
+        <!-- View: Login (Role Selection) -->
+        <div id="view-login" class="text-center">
+            <h2 class="text-2xl font-semibold mb-8 text-gray-200">Welcome. Please select your role.</h2>
+            <div class="flex flex-col md:flex-row gap-6 justify-center flex-wrap">
+                <!-- Admin Button -->
+                <button onclick="showView('admin-login')" class="group bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 px-8 rounded-lg text-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-cyan-400">
+                    <!-- Admin Icon -->
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622A11.99 11.99 0 0 0 18.002 6a11.959 11.959 0 0 1-4.502-1.786Z" />
+                    </svg>
+                    I am an Admin
+                </button>
+                <!-- Store Keeper Button -->
+                <button onclick="showView('store-keeper-login')" class="group bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 px-8 rounded-lg text-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-400">
+                    <!-- Store Keeper Icon -->
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 3.75 19.125v-4.5ZM13.5 4.875c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 13.5 9.375v-4.5ZM13.5 14.625c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 13.5 19.125v-4.5Z" />
+                    </svg>
+                    I am a Store Keeper
+                </button>
+                <!-- Client Button -->
+                <button onclick="showView('client-login')" class="group bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-8 rounded-lg text-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500">
+                    <!-- Client Icon -->
+                    <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                    </svg>
+                    I am a Client
+                </button>
+            </div>
+        </div>
+
+        <!-- View: Client Login -->
+        <div id="view-client-login" class="hidden max-w-md mx-auto">
+            <button onclick="showView('login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Back
+            </button>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-6 text-center text-white">Client Portal</h2>
+                <div class="space-y-4">
+                    <label for="client-name-input" class="block text-sm font-medium text-gray-300">Enter Your Client Name</label>
+                    <input type="text" id="client-name-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="e.g., 'Awesome Apparel'">
+                    <button id="client-login-btn" onclick="handleClientLogin()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:opacity-50">
+                        <span class="btn-spinner hidden"></span>
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                        </svg>
+                        <span>View Inventory</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Admin Login -->
+        <div id="view-admin-login" class="hidden max-w-md mx-auto">
+            <button onclick="showView('login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Back
+            </button>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-6 text-center text-white">Admin Login</h2>
+                <div class="space-y-4">
+                    <label for="admin-key-input" class="block text-sm font-medium text-gray-300">Enter Secret Key</label>
+                    <input type="password" id="admin-key-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="••••••••">
+                    <button id="admin-login-btn" onclick="handleAdminLogin()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500 disabled:opacity-50">
+                        <span class="btn-spinner hidden"></span>
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                        </svg>
+                        <span>Login</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Store Keeper Login -->
+        <div id="view-store-keeper-login" class="hidden max-w-md mx-auto">
+            <button onclick="showView('login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Back
+            </button>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-6 text-center text-white">Store Keeper Login</h2>
+                <div class="space-y-4">
+                    <label for="store-keeper-key-input" class="block text-sm font-medium text-gray-300">Enter Secret Key</label>
+                    <input type="password" id="store-keeper-key-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400" placeholder="••••••••">
+                    <button id="store-keeper-login-btn" onclick="handleStoreKeeperLogin()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500 disabled:opacity-50">
+                        <span class="btn-spinner hidden"></span>
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                        </svg>
+                        <span>Login</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Store Keeper (Scan Port) -->
+        <div id="view-store-keeper" class="hidden max-w-xl mx-auto">
+            <button onclick="showView('login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Logout
+            </button>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl text-center">
+                <h2 class="text-2xl font-semibold mb-6 text-white">Scan Port</h2>
+                <svg class="w-16 h-16 mx-auto text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 3.75 19.125v-4.5ZM13.5 4.875c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 13.5 9.375v-4.5ZM13.5 14.625c0-1.036.84-1.875 1.875-1.875h4.5c1.036 0 1.875.84 1.875 1.875v4.5c0 1.036-.84 1.875-1.875 1.875h-4.5A1.875 1.875 0 0 1 13.5 19.125v-4.5Z" />
+                </svg>
+                <p class="mt-4 text-gray-300">Click the input field and scan an item barcode. The scanner will input the ID and press 'Enter' automatically.</p>
+                <input type="text" id="scan-input" class="w-full p-4 mt-6 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 text-lg text-center" placeholder="Waiting for scan...">
+            </div>
+        </div>
+
+        <!-- View: Admin Dashboard (Client List) -->
+        <div id="view-admin" class="hidden">
+            <button onclick="showView('login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Logout
+            </button>
+            <h2 class="text-2xl font-semibold mb-6 text-white">Admin Dashboard: All Clients</h2>
+            
+            <!-- Add New Client Form -->
+            <form id="add-client-form" class="bg-gray-800 p-4 rounded-lg shadow-lg mb-8 flex flex-col md:flex-row gap-4">
+                <label for="new-client-name" class="sr-only">New Client Name</label>
+                <input type="text" id="new-client-name" class="flex-grow p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="Enter new client name" required>
+                <button type="submit" id="add-client-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500 disabled:opacity-50">
+                    <span class="btn-spinner hidden"></span>
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+                    </svg>
+                    <span>Add New Client</span>
+                </button>
+            </form>
+
+            <!-- Client List -->
+            <div id="client-list" class="space-y-4">
+                <!-- Client cards will be injected here by JavaScript -->
+                <!-- Admin Client List Empty State -->
+                <div id="admin-client-empty" class="hidden text-center bg-gray-800 rounded-lg shadow-lg p-10">
+                    <svg class="w-16 h-16 mx-auto text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                    </svg>
+                    <h3 class="mt-4 text-xl font-semibold text-white">No Clients Found</h3>
+                    <p class="mt-2 text-gray-400">Get started by adding a new client above.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Admin Client View (Manage Inventory) -->
+        <div id="view-admin-client-view" class="hidden">
+            <button onclick="showView('admin')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Back to All Clients
+            </button>
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                <h2 class="text-2xl font-semibold text-white" id="admin-client-header">Managing: </h2>
+                <button id="admin-generate-report-btn" onclick="handleGenerateReport(true)" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-5 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 disabled:opacity-50">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+                    </svg>
+                    <span>Generate Inventory Report</span>
+                </button>
+            </div>
+            
+            <!-- Add/Edit Item Form -->
+            <form id="item-form" class="bg-gray-800 p-6 rounded-lg shadow-2xl mb-8">
+                <h3 id="item-form-title" class="text-xl font-semibold mb-6 text-white">Add New Inventory Item</h3>
+                
+                <!-- Main Item Details -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="item-style" class="block text-sm font-medium text-gray-300 mb-1">Style</label>
+                        <input type="text" id="item-style" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="e.g., Hoodie" required>
+                    </div>
+                    <div>
+                        <label for="item-design" class="block text-sm font-medium text-gray-300 mb-1">Design</label>
+                        <input type="text" id="item-design" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="e.g., 'Logo V1'" required>
+                    </div>
+                    <div>
+                        <label for="item-size" class="block text-sm font-medium text-gray-300 mb-1">Size</label>
+                        <input type="text" id="item-size" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="e.g., M" required>
+                    </div>
+                </div>
+
+                <!-- Initial Quantity (for New Items) -->
+                <div id="item-quantity-div">
+                    <label for="item-quantity" class="block text-sm font-medium text-gray-300 mb-1">Initial Quantity</label>
+                    <input type="number" id="item-quantity" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="Quantity" min="0" required>
+                </div>
+
+                <!-- Update Quantity (for Editing Items) -->
+                <div id="edit-quantity-section" class="hidden pt-6 border-t border-gray-700">
+                    <h4 class="text-lg font-semibold text-white mb-3">Update Quantity</h4>
+                    <p class="text-gray-300 mb-4">Current Stock: 
+                        <span id="current-stock-display" class="text-2xl font-bold text-cyan-400">0</span>
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="flex-grow">
+                            <label for="quantity-change-input" class="sr-only">Amount to Add/Remove</label>
+                            <input type="number" id="quantity-change-input" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-cyan-400" placeholder="Enter amount" min="1">
+                        </div>
+                        <button type="button" id="add-stock-btn" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-green-500 disabled:opacity-50">
+                            <span class="btn-spinner hidden"></span>
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                            <span>Add Stock</span>
+                        </button>
+                        <button type="button" id="remove-stock-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 disabled:opacity-50">
+                            <span class="btn-spinner hidden"></span>
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
+                            <span>Remove Stock</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Form Buttons -->
+                <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-gray-700">
+                    <button type="submit" id="item-submit-btn" class="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500 disabled:opacity-50">
+                        <span class="btn-spinner hidden"></span>
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        <span>Add Item</span>
+                    </button>
+                    <button type="button" id="cancel-edit-btn" onclick="resetItemForm()" class="hidden w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-gray-500">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Inventory Table -->
+            <div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead class="bg-gray-700/50">
+                            <tr>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Style</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Design</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Size</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">QR Code</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Qty</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Status</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-inventory-table-body" class="divide-y divide-gray-700">
+                            <!-- Admin inventory rows will be injected here -->
+                            <!-- Admin Inventory Empty State -->
+                            <tr id="admin-inventory-empty" class="hidden">
+                                <td colspan="7" class="p-0">
+                                    <div class="text-center p-10">
+                                        <svg class="w-16 h-16 mx-auto text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10.5 11.25h3M12 15h.008" />
+                                        </svg>
+                                        <h3 class="mt-4 text-xl font-semibold text-white">No Inventory</h3>
+                                        <p class="mt-2 text-gray-400">Add the first item using the form above.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Client Inventory (Read-Only) -->
+        <div id="view-client-view" class="hidden">
+            <button onclick="showView('client-login')" class="text-cyan-400 hover:underline mb-4 flex items-center gap-1">
+                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Back to Login
+            </button>
+            <h2 class="text-2xl font-semibold mb-6 text-white" id="client-inventory-header">Your Inventory:</h2>
+            
+            <!-- Client Inventory Table -->
+            <div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead class="bg-gray-700/50">
+                            <tr>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Style</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Design</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Size</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Qty</th>
+                                <th class="p-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="client-inventory-table-body" class="divide-y divide-gray-700">
+                            <!-- Client inventory rows will be injected here -->
+                            <!-- Client Inventory Empty State -->
+                            <tr id="client-inventory-empty" class="hidden">
+                                <td colspan="5" class="p-0">
+                                    <div class="text-center p-10">
+                                        <svg class="w-16 h-16 mx-auto text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10.5 11.25h3M12 15h.008" />
+                                        </svg>
+                                        <h3 class="mt-4 text-xl font-semibold text-white">No Inventory Found</h3>
+                                        <p class="mt-2 text-gray-400">Your inventory is currently empty.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase JS SDK -->
+    <script type="module">
+        // --- Gemini API Configuration ---
+        const apiKey = "AIzaSyD_ImQ9LC54BNOgvqs3832xrKzPaMYmGqc"; // Per instructions, leave empty.
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const ADMIN_SECRET_KEY = 'reflex2025';
+
+        // --- Firebase Configuration ---
+        // !!! IMPORTANT !!!
+        // PASTE YOUR FIREBASE CONFIG OBJECT HERE (from Step 5 above)
+        // It will look like: const firebaseConfig = { apiKey: "...", ... };
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCgzeRDWFgIa9QV_d36Syj7vJHaQ2yHe2w",
+  authDomain: "reflex2k-inventory.firebaseapp.com",
+  projectId: "reflex2k-inventory",
+  storageBucket: "reflex2k-inventory.firebasestorage.app",
+  messagingSenderId: "429699072001",
+  appId: "1:429699072001:web:3f6eba67e2de2bcc228000",
+  measurementId: "G-JCSS5GCWMS"
+};
+        // --- End of Firebase Configuration ---
+
+        // The appId is now part of the firebaseConfig
+        const appId = firebaseConfig.projectId || 'default-app-id';
+        // The initialAuthToken is only for the Canvas environment, not for the live site.
+        const initialAuthToken = null; // This will force anonymous sign-in on the live site.
+
+        // --- Firebase Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc,
+            collection, 
+            onSnapshot,
+            query,
+            where,
+            getDocs,
+            addDoc,
+            increment,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Initialization ---
+        let app, db, auth, userId;
+        let clientListListener = null;
+        let inventoryListener = null;
+
+        // --- Global State ---
+        let currentClientName = null;
+        let editingItemId = null;
+        let currentInventoryMap = new Map();
+        const inventoryStatuses = ["Received", "In Printing", "Shipped", "Completed"];
+        let scannedItemInfo = {}; // To hold data for the scan modal
+        let scanModalListener = null; // To update stock in scan modal
+
+        // --- UI Element References ---
+        const loadingSpinner = document.getElementById('loading');
+        const successToast = document.getElementById('success-toast');
+        const errorToast = document.getElementById('error-toast');
+        const successMessage = document.getElementById('success-message');
+        const errorMessage = document.getElementById('error-message');
+        
+        const reportModal = document.getElementById('report-modal');
+        const reportModalSpinner = document.getElementById('report-modal-spinner');
+        const reportModalText = document.getElementById('report-modal-text');
+        
+        const itemScanModal = document.getElementById('item-scan-modal');
+        const scanModalContent = document.getElementById('scan-modal-content');
+        const scanCurrentStockDisplay = document.getElementById('scan-current-stock-display');
+        const scanQuantityChangeInput = document.getElementById('scan-quantity-change-input');
+        const scanAddStockBtn = document.getElementById('scan-add-stock-btn');
+        const scanRemoveStockBtn = document.getElementById('scan-remove-stock-btn');
+
+        const allViews = document.querySelectorAll('[id^="view-"]');
+        
+        const addClientForm = document.getElementById('add-client-form');
+        const newClientNameInput = document.getElementById('new-client-name');
+        const addClientBtn = document.getElementById('add-client-btn');
+        const clientListDiv = document.getElementById('client-list');
+        const adminClientEmpty = document.getElementById('admin-client-empty');
+        
+        const clientNameInput = document.getElementById('client-name-input');
+        const clientLoginBtn = document.getElementById('client-login-btn');
+
+        const adminKeyInput = document.getElementById('admin-key-input');
+        const adminLoginBtn = document.getElementById('admin-login-btn');
+
+        const storeKeeperKeyInput = document.getElementById('store-keeper-key-input');
+        const storeKeeperLoginBtn = document.getElementById('store-keeper-login-btn');
+        const scanInput = document.getElementById('scan-input');
+
+        const adminClientHeader = document.getElementById('admin-client-header');
+        const itemForm = document.getElementById('item-form');
+        const itemFormTitle = document.getElementById('item-form-title');
+        const itemSubmitBtn = document.getElementById('item-submit-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const itemQuantityDiv = document.getElementById('item-quantity-div');
+        const editQuantitySection = document.getElementById('edit-quantity-section');
+        const currentStockDisplay = document.getElementById('current-stock-display');
+        const quantityChangeInput = document.getElementById('quantity-change-input');
+        const addStockBtn = document.getElementById('add-stock-btn');
+        const removeStockBtn = document.getElementById('remove-stock-btn');
+        
+        const adminInventoryTableBody = document.getElementById('admin-inventory-table-body');
+        const adminInventoryEmpty = document.getElementById('admin-inventory-empty');
+        
+        const clientInventoryHeader = document.getElementById('client-inventory-header');
+        const clientInventoryTableBody = document.getElementById('client-inventory-table-body');
+        const clientInventoryEmpty = document.getElementById('client-inventory-empty');
+
+        // --- Utility: Button Loaders ---
+        function setButtonLoading(button, isLoading) {
+            const spinner = button.querySelector('.btn-spinner');
+            const text = button.querySelector('span:not(.btn-spinner)');
+            if (isLoading) {
+                button.disabled = true;
+                spinner?.classList.remove('hidden');
+                if (text) text.style.display = 'none'; // Hide text
+            } else {
+                button.disabled = false;
+                spinner?.classList.add('hidden');
+                if (text) text.style.display = 'inline'; // Show text
+            }
+        }
+        
+        // --- Utility: Toasts ---
+        let toastTimeout;
+        function showToast(message, isError = false) {
+            clearTimeout(toastTimeout);
+            const toast = isError ? errorToast : successToast;
+            const textEl = isError ? errorMessage : successMessage;
+
+            textEl.textContent = message;
+            toast.classList.remove('toast-hidden');
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('toast-hidden');
+            }, 3000);
+        }
+        window.showError = (message) => showToast(message, true);
+        window.showSuccess = (message) => showToast(message, false);
+
+
+        // --- Utility: View Management ---
+        function showLoading(isLoading) {
+            loadingSpinner.classList.toggle('hidden', !isLoading);
+        }
+
+        window.showView = function(viewId) {
+            // Detach listeners when changing views to prevent background updates
+            if (clientListListener) clientListListener();
+            if (inventoryListener) inventoryListener();
+            if (scanModalListener) scanModalListener(); // Detach scan modal listener
+            clientListListener = null;
+            inventoryListener = null;
+            scanModalListener = null;
+            
+            allViews.forEach(view => view.classList.add('hidden'));
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+
+            // Re-attach listeners for the new view
+            if (viewId === 'admin') {
+                fetchClients();
+            } else if (viewId === 'store-keeper') {
+                // When store keeper logs in, focus the scan input
+                scanInput.value = "";
+                scanInput.focus();
+            } else if (viewId === 'login') {
+                currentClientName = null;
+                clientNameInput.value = "";
+                adminKeyInput.value = "";
+                storeKeeperKeyInput.value = "";
+                resetItemForm();
+            }
+        }
+
+        function renderStatusBadge(status) {
+            let color = "bg-gray-600";
+            if (status === "Received") color = "bg-blue-600";
+            else if (status === "In Printing") color = "bg-yellow-600 text-gray-900";
+            else if (status === "Shipped") color = "bg-purple-600";
+            else if (status === "Completed") color = "bg-green-600";
+            
+            return `<span class="px-3 py-1 text-xs font-semibold rounded-full ${color}">${status}</span>`;
+        }
+
+        // --- Firebase Collection References ---
+        function getClientCollectionRef() {
+            // This points to the collection OF clients
+            return collection(db, `/artifacts/${appId}/public/data/clients`);
+        }
+        function getClientDocRef(clientName) {
+            // This points to a specific client document
+            return doc(db, `/artifacts/${appId}/public/data/clients/${clientName}`);
+        }
+        function getInventoryCollectionRef(clientName) {
+            // This points to the inventory sub-collection FOR a specific client
+            return collection(db, `/artifacts/${appId}/public/data/clients/${clientName}/inventory`);
+        }
+        function getInventoryDocRef(clientName, itemId) {
+            // This points to a specific inventory item FOR a specific client
+            return doc(db, `/artifacts/${appId}/public/data/clients/${clientName}/inventory/${itemId}`);
+        }
+        function getBarcodeLookupCollectionRef() {
+            // New top-level collection for barcode lookups
+            return collection(db, `/artifacts/${appId}/public/data/barcode_lookup`);
+        }
+        function getBarcodeLookupDocRef(barcodeId) {
+            return doc(db, `/artifacts/${appId}/public/data/barcode_lookup/${barcodeId}`);
+        }
+
+        // --- Admin Functions ---
+        function fetchClients() {
+            showLoading(true);
+            const clientColRef = getClientCollectionRef();
+            
+            clientListListener = onSnapshot(clientColRef, (querySnapshot) => {
+                clientListDiv.innerHTML = ""; 
+                adminClientEmpty.classList.toggle('hidden', querySnapshot.empty);
+                
+                querySnapshot.forEach((doc) => {
+                    const client = doc.data();
+                    const clientCard = document.createElement('div');
+                    clientCard.className = "bg-gray-800 p-5 rounded-lg shadow-lg flex justify-between items-center";
+                    clientCard.innerHTML = `
+                        <span class="text-lg font-medium text-white">${client.clientName}</span>
+                        <button class="manage-client-btn bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                            </svg>
+                            Manage
+                        </button>
+                    `;
+                    clientCard.querySelector('.manage-client-btn').onclick = () => {
+                        currentClientName = client.clientName;
+                        showView('admin-client-view');
+                        adminClientHeader.innerHTML = `Managing: <span class="text-cyan-400">${client.clientName}</span>`;
+                        listenToInventory(client.clientName, true);
+                    };
+                    clientListDiv.appendChild(clientCard);
+                });
+                showLoading(false);
+            }, (error) => {
+                console.error("Error fetching clients: ", error);
+                showError("Failed to fetch clients.");
+                showLoading(false);
+            });
+        }
+
+        async function handleAddNewClient(event) {
+            event.preventDefault();
+            const clientName = newClientNameInput.value.trim();
+            if (!clientName) {
+                showError("Client name cannot be empty.");
+                return;
+            }
+
+            setButtonLoading(addClientBtn, true);
+            try {
+                // Use clientName as the document ID for simplicity and uniqueness
+                const clientDocRef = getClientDocRef(clientName);
+                const docSnap = await getDoc(clientDocRef);
+                if (docSnap.exists()) {
+                    showError("A client with this name already exists.");
+                } else {
+                    await setDoc(clientDocRef, { clientName: clientName });
+                    newClientNameInput.value = ""; 
+                    showSuccess("Client added successfully!");
+                }
+            } catch (error) {
+                console.error("Error adding new client: ", error);
+                showError("Failed to add client.");
+            }
+            setButtonLoading(addClientBtn, false);
+        }
+
+        // --- Admin Login ---
+        window.handleAdminLogin = function() {
+            const key = adminKeyInput.value;
+            setButtonLoading(adminLoginBtn, true);
+
+            // Simple check for the hardcoded key
+            if (key === ADMIN_SECRET_KEY) {
+                showView('admin');
+                adminKeyInput.value = ""; // Clear key on success
+            } else {
+                showError("Invalid secret key.");
+            }
+            
+            setButtonLoading(adminLoginBtn, false);
+        }
+
+        // --- Store Keeper Login ---
+        window.handleStoreKeeperLogin = function() {
+            const key = storeKeeperKeyInput.value;
+            setButtonLoading(storeKeeperLoginBtn, true);
+
+            // Reuse the same admin key
+            if (key === ADMIN_SECRET_KEY) {
+                showView('store-keeper');
+                storeKeeperKeyInput.value = ""; // Clear key on success
+            } else {
+                showError("Invalid secret key.");
+            }
+            
+            setButtonLoading(storeKeeperLoginBtn, false);
+        }
+
+        function listenToInventory(clientName, isAdmin) {
+            showLoading(true);
+            const invColRef = getInventoryCollectionRef(clientName);
+
+            inventoryListener = onSnapshot(invColRef, (querySnapshot) => {
+                const inventory = [];
+                currentInventoryMap.clear(); 
+                
+                querySnapshot.forEach((doc) => {
+                    const item = { id: doc.id, ...doc.data() };
+                    inventory.push(item);
+                    if (isAdmin) currentInventoryMap.set(item.id, item);
+                });
+                
+                renderInventoryTable(inventory, isAdmin);
+                showLoading(false);
+            }, (error) => {
+                console.error("Error listening to inventory: ", error);
+                showError("Failed to load inventory.");
+                showLoading(false);
+            });
+        }
+
+        function renderInventoryTable(inventory, isAdmin) {
+            const tableBody = isAdmin ? adminInventoryTableBody : clientInventoryTableBody;
+            const emptyRow = isAdmin ? adminInventoryEmpty : clientInventoryEmpty;
+            
+            tableBody.innerHTML = ""; // Clear table
+            emptyRow.classList.toggle('hidden', inventory.length > 0);
+            if (inventory.length === 0) tableBody.appendChild(emptyRow);
+
+            inventory.sort((a, b) => {
+                if (a.style.toLowerCase() < b.style.toLowerCase()) return -1; if (a.style.toLowerCase() > b.style.toLowerCase()) return 1;
+                if (a.design.toLowerCase() < b.design.toLowerCase()) return -1; if (a.design.toLowerCase() > b.design.toLowerCase()) return 1;
+                if (a.size.toLowerCase() < b.size.toLowerCase()) return -1; if (a.size.toLowerCase() > b.size.toLowerCase()) return 1;
+                return 0;
+            });
+
+            inventory.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-700/50 transition-colors duration-150";
+                
+                let adminControls = '';
+                let barcodeCell = '';
+
+                if (isAdmin) {
+                    // --- Barcode Cell ---
+                    if (item.barcodeId && item.barcodeId !== 'generating...') {
+                        // Use a canvas for the QR code, styled to be square
+                        barcodeCell = `<td class="p-4"><canvas id="barcode-${item.id}" class="w-20 h-20"></canvas></td>`;
+                    } else {
+                        barcodeCell = `
+                            <td class="p-4">
+                                <button onclick="generateBarcodeForItem('${item.id}')" class="text-xs bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-1 px-2 rounded-lg transition-all duration-200">
+                                    Generate
+                                </button>
+                            </td>`;
+                    }
+
+                    // --- Admin Controls Cell ---
+                    const statusOptions = inventoryStatuses.map(status => 
+                        `<option value="${status}" ${item.status === status ? 'selected' : ''}>${status}</option>`
+                    ).join('');
+                    
+                    adminControls = `
+                        <td class="p-4">
+                            <select data-item-id="${item.id}" class="status-select bg-gray-600 border border-gray-500 rounded-lg p-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-cyan-400">
+                                ${statusOptions}
+                            </select>
+                        </td>
+                        <td class="p-4 whitespace-nowrap space-x-2">
+                            <button data-item-id="${item.id}" class="edit-item-btn text-cyan-400 hover:text-cyan-300 p-1 rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                            </button>
+                            <button data-item-id="${item.id}" class="delete-item-btn text-red-500 hover:text-red-400 p-1 rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12.54 0c.04.05.077.1.115.149a48.108 48.108 0 0 1 3.478-.397m7.468 0c-.34.052-.68.107-1.022.166" /></svg>
+                            </button>
+                        </td>
+                    `;
+                }
+
+                row.innerHTML = `
+                    <td class="p-4 whitespace-nowrap">${item.style}</td>
+                    <td class="p-4 whitespace-nowrap">${item.design}</td>
+                    <td class="p-4 whitespace-nowrap text-center">${item.size}</td>
+                    ${isAdmin ? barcodeCell : ''}
+                    <td class="p-4 whitespace-nowrap text-center font-medium">${item.quantity}</td>
+                    <td class="p-4 whitespace-nowrap">${renderStatusBadge(item.status)}</td>
+                    ${isAdmin ? adminControls : ''}
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // --- Render QR Codes ---
+            if (isAdmin) {
+                inventory.forEach(item => {
+                    if (item.barcodeId && item.barcodeId !== 'generating...') {
+                        try {
+                            const canvasEl = document.getElementById(`barcode-${item.id}`);
+                            if (canvasEl) {
+                                new QRious({
+                                    element: canvasEl,
+                                    value: item.barcodeId,
+                                    size: 80, // 80px (w-20 h-20)
+                                    background: '#00000000', // Transparent
+                                    foreground: '#FFFFFF', // White
+                                    level: 'M' // Medium error correction
+                                });
+                            }
+                        } catch (e) {
+                            console.error("Error rendering QR code:", e);
+                            // Hide the broken canvas
+                            const canvasEl = document.getElementById(`barcode-${item.id}`);
+                            if(canvasEl) canvasEl.style.display = 'none';
+                        }
+                    }
+                });
+            }
+
+            // Add event listeners after rows are created
+            if (isAdmin) {
+                document.querySelectorAll('.status-select').forEach(select => {
+                    select.onchange = (e) => handleUpdateStatus(e.target.dataset.itemId, e.target.value);
+                });
+                document.querySelectorAll('.edit-item-btn').forEach(button => {
+                    button.onclick = (e) => handleEditItemClick(e.currentTarget.dataset.itemId);
+                });
+                document.querySelectorAll('.delete-item-btn').forEach(button => {
+                    button.onclick = (e) => handleDeleteItem(e.currentTarget.dataset.itemId);
+                });
+            }
+        }
+
+        // --- New Function: Generate Barcode for existing item ---
+        window.generateBarcodeForItem = async function(itemId) {
+            if (!currentClientName || !itemId) return;
+            
+            showLoading(true);
+            try {
+                // The item's ID *is* the barcode ID
+                const itemDocRef = getInventoryDocRef(currentClientName, itemId);
+                const barcodeLookupRef = getBarcodeLookupDocRef(itemId);
+
+                // 1. Add barcodeId to the item document
+                await updateDoc(itemDocRef, { barcodeId: itemId });
+                
+                // 2. Create the entry in the lookup collection
+                await setDoc(barcodeLookupRef, { clientName: currentClientName });
+
+                showSuccess("Barcode generated and linked!");
+            } catch (error) {
+                console.error("Error generating barcode:", error);
+                showError("Failed to generate barcode.");
+            }
+            showLoading(false);
+            // The onSnapshot listener will auto-refresh the table
+        }
+
+        async function handleSubmitItemForm(event) {
+            event.preventDefault();
+            const itemData = {
+                style: document.getElementById('item-style').value.trim(),
+                design: document.getElementById('item-design').value.trim(),
+                size: document.getElementById('item-size').value.trim(),
+            };
+
+            const initialQuantity = parseInt(document.getElementById('item-quantity').value);
+
+            if (!itemData.style || !itemData.design || !itemData.size) {
+                showError("Please fill out Style, Design, and Size.");
+                return;
+            }
+
+            setButtonLoading(itemSubmitBtn, true);
+            try {
+                if (editingItemId) {
+                    // This is an EDIT operation.
+                    // We only update the text fields. Quantity is handled separately.
+                    const itemDocRef = getInventoryDocRef(currentClientName, editingItemId);
+                    await updateDoc(itemDocRef, {
+                        style: itemData.style,
+                        design: itemData.design,
+                        size: itemData.size
+                    });
+                    showSuccess("Item details updated successfully!");
+
+                } else {
+                    // This is a NEW item operation.
+                    if (isNaN(initialQuantity) || initialQuantity < 0) {
+                        showError("Please enter a valid initial quantity (0 or more).");
+                        setButtonLoading(itemSubmitBtn, false);
+                        return;
+                    }
+                    
+                    const invColRef = getInventoryCollectionRef(currentClientName);
+                    const q = query(invColRef, 
+                        where("style", "==", itemData.style), 
+                        where("design", "==", itemData.design),
+                        where("size", "==", itemData.size)
+                    );
+                    
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (querySnapshot.empty) {
+                        // Item doesn't exist, add as new doc
+                        // Add with status and placeholder barcodeId
+                        const docRef = await addDoc(invColRef, { ...itemData, quantity: initialQuantity, status: "Received", barcodeId: "generating..." });
+                        
+                        // Now update it with its own ID as the barcodeId
+                        const newItemId = docRef.id;
+                        await updateDoc(docRef, { barcodeId: newItemId });
+
+                        // Create the lookup entry
+                        const barcodeLookupRef = getBarcodeLookupDocRef(newItemId);
+                        await setDoc(barcodeLookupRef, { clientName: currentClientName });
+
+                        showSuccess("New item added!");
+                    } else {
+                        // Item *does* exist. We should not create it.
+                        // Instead, we can just show an error.
+                        showError("This item (style, design, size) already exists. Please edit it instead.");
+                    }
+                }
+                resetItemForm();
+            } catch (error) {
+                console.error("Error submitting item: ", error);
+                showError("Failed to save item.");
+            }
+            setButtonLoading(itemSubmitBtn, false);
+        }
+
+        window.handleEditItemClick = function(itemId) {
+            const item = currentInventoryMap.get(itemId);
+            if (!item) return showError("Could not find item to edit.");
+            
+            editingItemId = itemId; 
+
+            // Fill in the details
+            document.getElementById('item-style').value = item.style;
+            document.getElementById('item-design').value = item.design;
+            document.getElementById('item-size').value = item.size;
+            
+            // Hide initial quantity input, show edit quantity section
+            itemQuantityDiv.classList.add('hidden');
+            editQuantitySection.classList.remove('hidden');
+            currentStockDisplay.textContent = item.quantity;
+            
+            // Show submit/cancel buttons
+            itemSubmitBtn.classList.remove('hidden');
+            cancelEditBtn.classList.remove('hidden');
+
+            itemFormTitle.textContent = "Edit Item Details";
+            // Change submit button to "Update"
+            itemSubmitBtn.querySelector('span:not(.btn-spinner)').textContent = "Update Details";
+            itemSubmitBtn.querySelector('svg').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />`;
+
+            itemForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        window.resetItemForm = function() {
+            editingItemId = null;
+            itemForm.reset();
+            
+            // Show initial quantity, hide edit section
+            itemQuantityDiv.classList.remove('hidden');
+            editQuantitySection.classList.add('hidden');
+            quantityChangeInput.value = "";
+            
+            // Hide submit/cancel, as they are part of the main div
+            itemSubmitBtn.classList.remove('hidden');
+            cancelEditBtn.classList.add('hidden');
+
+            itemFormTitle.textContent = "Add New Inventory Item";
+            itemSubmitBtn.querySelector('span:not(.btn-spinner)').textContent = "Add Item";
+            itemSubmitBtn.querySelector('svg').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />`;
+        }
+
+        window.handleUpdateStatus = async function(itemId, newStatus) {
+            try {
+                const itemDocRef = getInventoryDocRef(currentClientName, itemId);
+                await updateDoc(itemDocRef, { status: newStatus });
+                showSuccess("Status updated!");
+            } catch (error) {
+                console.error("Error updating status: ", error);
+                showError("Failed to update status.");
+            }
+        }
+
+        window.handleDeleteItem = async function(itemId) {
+            // NOTE: A custom modal is recommended here instead of auto-deleting.
+            // Since alert/confirm are disallowed, we proceed with the delete.
+            
+            try {
+                const itemDocRef = getInventoryDocRef(currentClientName, itemId);
+                const barcodeLookupRef = getBarcodeLookupDocRef(itemId);
+
+                // Delete the item
+                await deleteDoc(itemDocRef);
+                
+                // Delete the barcode lookup entry
+                await deleteDoc(barcodeLookupRef);
+
+                showSuccess("Item deleted.");
+            } catch (error) {
+                console.error("Error deleting item: ", error);
+                showError("Failed to delete item.");
+            }
+        }
+
+        /**
+         * Handles Add/Remove stock from the *admin edit form*.
+         */
+        async function handleUpdateStock(event) {
+            if (!editingItemId) return;
+
+            const isAdding = event.target.id === 'add-stock-btn' || event.target.closest('#add-stock-btn');
+            const button = isAdding ? addStockBtn : removeStockBtn;
+            
+            const changeValue = parseInt(quantityChangeInput.value);
+            const currentItem = currentInventoryMap.get(editingItemId);
+            
+            if (isNaN(changeValue) || changeValue <= 0) {
+                showError("Please enter a positive amount.");
+                return;
+            }
+
+            if (!isAdding && changeValue > currentItem.quantity) {
+                showError("Cannot remove more stock than is available.");
+                return;
+            }
+            
+            setButtonLoading(button, true);
+            try {
+                const itemDocRef = getInventoryDocRef(currentClientName, editingItemId);
+                const valueToIncrement = isAdding ? changeValue : -changeValue;
+
+                await updateDoc(itemDocRef, { quantity: increment(valueToIncrement) });
+                
+                showSuccess(`Stock ${isAdding ? 'added' : 'removed'}!`);
+                quantityChangeInput.value = ""; // Clear input
+            } catch (error) {
+                console.error("Error updating stock:", error);
+                showError("Failed to update stock.");
+            }
+            setButtonLoading(button, false);
+        }
+
+
+        // --- Client Functions ---
+        async function handleClientLogin() {
+            const clientName = clientNameInput.value.trim();
+            if (!clientName) {
+                showError("Please enter your client name.");
+                return;
+            }
+            
+            setButtonLoading(clientLoginBtn, true);
+            try {
+                const clientDocRef = getClientDocRef(clientName);
+                const docSnap = await getDoc(clientDocRef);
+
+                if (docSnap.exists()) {
+                    currentClientName = clientName;
+                    clientInventoryHeader.innerHTML = `Your Inventory: <span class="text-cyan-400">${clientName}</span>`;
+                    showView('client-view');
+                    listenToInventory(clientName, false);
+                } else {
+                    showError("Client name not found. Please check spelling.");
+                }
+            } catch (error) {
+                console.error("Error during client login: ", error);
+                showError("An error occurred. Please try again.");
+            }
+            setButtonLoading(clientLoginBtn, false);
+        }
+
+        // --- Store Keeper Scan Functions ---
+        
+        /**
+         * Main function to handle the barcode scan input.
+         * Triggers on 'change' (which fires on 'Enter' for scanners).
+         */
+        async function handleBarcodeScan() {
+            const itemId = scanInput.value.trim();
+            if (!itemId) return;
+
+            showLoading(true);
+            try {
+                // 1. Find the client name from the lookup table
+                const lookupRef = getBarcodeLookupDocRef(itemId);
+                const lookupSnap = await getDoc(lookupRef);
+
+                if (!lookupSnap.exists()) {
+                    throw new Error("Barcode not found in lookup table.");
+                }
+
+                const { clientName } = lookupSnap.data();
+
+                // 2. Get the actual item document
+                const itemRef = getInventoryDocRef(clientName, itemId);
+                const itemSnap = await getDoc(itemRef);
+
+                if (!itemSnap.exists()) {
+                    throw new Error("Item data not found. Lookup may be stale.");
+                }
+
+                const itemData = { id: itemSnap.id, ...itemSnap.data() };
+                
+                // 3. Show the update modal
+                showItemScanModal(itemData, clientName);
+                
+            } catch (error) {
+                console.error("Error handling scan:", error);
+                showError(error.message || "Invalid Barcode");
+            }
+            
+            showLoading(false);
+            scanInput.value = ""; // Clear input for next scan
+            scanInput.focus(); // Keep focus on input
+        }
+
+        /**
+         * Shows the modal for updating a scanned item.
+         */
+        function showItemScanModal(item, clientName) {
+            // Store item info globally for the update function
+            scannedItemInfo = {
+                id: item.id,
+                clientName: clientName,
+                currentQuantity: item.quantity
+            };
+
+            // Populate modal details
+            document.getElementById('scan-item-style').textContent = item.style;
+            document.getElementById('scan-item-design').textContent = item.design;
+            document.getElementById('scan-item-size').textContent = item.size;
+            document.getElementById('scan-item-client').textContent = clientName;
+            scanCurrentStockDisplay.textContent = item.quantity;
+            scanQuantityChangeInput.value = "";
+            
+            itemScanModal.classList.remove('hidden');
+
+            // Attach a *live* listener to just this item to update the stock display
+            const itemDocRef = getInventoryDocRef(clientName, item.id);
+            scanModalListener = onSnapshot(itemDocRef, (doc) => {
+                if (doc.exists()) {
+                    const newQty = doc.data().quantity;
+                    scannedItemInfo.currentQuantity = newQty;
+                    scanCurrentStockDisplay.textContent = newQty;
+                } else {
+                    // Item was deleted while modal was open
+                    closeItemScanModal();
+                    showError("Item was deleted.");
+                }
+            });
+        }
+
+        /**
+         * Closes the item scan modal and detaches its listener.
+         */
+        window.closeItemScanModal = function() {
+            if (scanModalListener) scanModalListener(); // Detach listener
+            scanModalListener = null;
+            scannedItemInfo = {};
+            itemScanModal.classList.add('hidden');
+            scanInput.focus(); // Return focus to scan port
+        }
+
+        /**
+         * Handles Add/Remove stock from the *scan modal*.
+         */
+        async function handleStoreKeeperStockUpdate(event) {
+            const { id, clientName, currentQuantity } = scannedItemInfo;
+            if (!id || !clientName) return;
+
+            const isAdding = event.target.id === 'scan-add-stock-btn' || event.target.closest('#scan-add-stock-btn');
+            const button = isAdding ? scanAddStockBtn : scanRemoveStockBtn;
+            
+            const changeValue = parseInt(scanQuantityChangeInput.value);
+
+            if (isNaN(changeValue) || changeValue <= 0) {
+                showError("Please enter a positive amount.");
+                return;
+            }
+
+            if (!isAdding && changeValue > currentQuantity) {
+                showError("Cannot remove more stock than is available.");
+                return;
+            }
+
+            setButtonLoading(button, true);
+            try {
+                const itemDocRef = getInventoryDocRef(clientName, id);
+                const valueToIncrement = isAdding ? changeValue : -changeValue;
+                
+                await updateDoc(itemDocRef, { quantity: increment(valueToIncrement) });
+                
+                showSuccess(`Stock ${isAdding ? 'added' : 'removed'}!`);
+                scanQuantityChangeInput.value = ""; // Clear input
+            } catch (error) {
+                console.error("Error updating stock from scan:", error);
+                showError("Failed to update stock.");
+            }
+            setButtonLoading(button, false);
+        }
+
+        // --- Gemini API Functions ---
+        window.showReportModal = function(show) {
+            reportModal.classList.toggle('hidden', !show);
+        }
+
+        window.handleGenerateReport = async function(isAdmin) {
+            if (!currentClientName) return;
+
+            showReportModal(true);
+            reportModalText.classList.add('hidden');
+            reportModalSpinner.classList.remove('hidden');
+            reportModalSpinner.classList.add('flex');
+
+            try {
+                const inventoryData = Array.from(currentInventoryMap.values());
+                const report = await callGeminiAPI(inventoryData, isAdmin);
+                reportModalText.innerHTML = report.replace(/\n/g, '<br>'); // Show report
+            } catch (error) {
+                console.error("Error generating report:", error);
+                reportModalText.innerHTML = `<span class="text-red-400">Error: Could not generate report. ${error.message}</span>`;
+            }
+
+            reportModalSpinner.classList.add('hidden');
+            reportModalSpinner.classList.remove('flex');
+            reportModalText.classList.remove('hidden');
+        }
+
+        async function callGeminiAPI(inventoryData, isAdmin, retryCount = 0) {
+            if (inventoryData.length === 0) {
+                return "There is no inventory to report.";
+            }
+
+            // 1. Create a simplified list for the prompt
+            const simpleInventory = inventoryData.map(item => ({
+                name: `${item.style} - ${item.design} - ${item.size}`,
+                quantity: item.quantity,
+                status: item.status
+            }));
+
+            // 2. Define the prompts
+            const clientPrompt = `
+                You are an inventory assistant. Summarize the following inventory list for a client in a brief, friendly paragraph. 
+                Mention the general stock levels and what items are in production (status "In Printing" or "Shipped"). 
+                Do not mention specific low stock items.
+                
+                Inventory: ${JSON.stringify(simpleInventory)}
+            `;
+            
+            const adminPrompt = `
+                You are an internal inventory analyst. Provide a concise, bulleted summary of the following inventory for an admin.
+                Your summary must include:
+                1.  A brief opening statement about the overall stock health for "${currentClientName}".
+                2.  A "Low Stock Alert" section (use this exact heading) that lists *specific* items with less than 10 quantity. If no items are low stock, state "All items are well-stocked."
+                3.  A "Production Status" section (use this exact heading) that summarizes items currently "In Printing" or "Shipped".
+                
+                Inventory: ${JSON.stringify(simpleInventory)}
+            `;
+
+            const userQuery = isAdmin ? adminPrompt : clientPrompt;
+            const systemPrompt = "Act as an inventory report generator. Your response must be concise, accurate, and formatted in plain text (use bullet points * only for the admin report).";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetch(geminiApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    if (response.status === 429 && retryCount < 3) { // Handle throttling
+                        const delay = Math.pow(2, retryCount) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return callGeminiAPI(inventoryData, isAdmin, retryCount + 1);
+                    }
+                    const errorBody = await response.text();
+                    throw new Error(`API Error ${response.status}: ${errorBody}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!text) {
+                    throw new Error("No content returned from API.");
+                }
+                return text;
+
+            } catch (error) {
+                console.error("Gemini API call failed:", error);
+                throw new Error(error.message || "Failed to fetch from Gemini API");
+            }
+        }
+
+        // --- Global Event Listeners ---
+        addClientForm.onsubmit = handleAddNewClient;
+        itemForm.onsubmit = handleSubmitItemForm;
+        addStockBtn.onclick = handleUpdateStock;
+        removeStockBtn.onclick = handleUpdateStock;
+        scanInput.onchange = handleBarcodeScan; // Use onchange, as scanners hit 'Enter'
+        scanAddStockBtn.onclick = handleStoreKeeperStockUpdate;
+        scanRemoveStockBtn.onclick = handleStoreKeeperStockUpdate;
+
+        // --- Initialization Function ---
+        async function initFirebase() {
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
+                showToast("Firebase configuration is missing. Please paste it from your Firebase project settings.", true);
+                return;
+            }
+            
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('error'); // 'debug' for more verbose logs, 'error' for production
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // console.log("User is signed in with UID:", userId);
+                        showView('login'); // Show login view after auth is ready
+                    } else {
+                        // No user, sign in.
+                        // On the live site, we ALWAYS sign in anonymously.
+                        // The initialAuthToken logic is only for the Canvas preview.
+                        if (initialAuthToken) {
+                             await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                showToast("Fatal Error: Could not connect to services.", true);
+            }
+        }
+
+        // --- Assign global functions to window object ---
+        // This makes them accessible to the inline onclick="" attributes
+        window.handleClientLogin = handleClientLogin;
+        window.handleAdminLogin = handleAdminLogin;
+        window.handleStoreKeeperLogin = handleStoreKeeperLogin;
+        window.handleGenerateReport = handleGenerateReport;
+        window.showReportModal = showReportModal;
+        window.generateBarcodeForItem = generateBarcodeForItem;
+        window.closeItemScanModal = closeItemScanModal;
+        window.handleUpdateStatus = handleUpdateStatus;
+        window.handleDeleteItem = handleDeleteItem;
+        window.handleEditItemClick = handleEditItemClick;
+        window.resetItemForm = resetItemForm;
+        
+        // --- Start the application ---
+        window.onload = initFirebase;
+    </script>
+
+</body>
+</html>
+
+
+
